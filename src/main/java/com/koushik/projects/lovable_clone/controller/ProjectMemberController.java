@@ -2,6 +2,7 @@ package com.koushik.projects.lovable_clone.controller;
 
 import com.koushik.projects.lovable_clone.dto.member.InviteMemberRequest;
 import com.koushik.projects.lovable_clone.dto.member.MemberResponse;
+import com.koushik.projects.lovable_clone.dto.member.UpdateMemberRoleRequest;
 import com.koushik.projects.lovable_clone.service.ProjectMemberService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpEntity;
@@ -38,14 +39,14 @@ public class ProjectMemberController {
     public ResponseEntity<MemberResponse>updateMemberRole(
             @PathVariable Long projectId,
             @PathVariable Long memberId,
-            @RequestBody InviteMemberRequest request
+            @RequestBody UpdateMemberRoleRequest request
     ){
         Long userId = 1L;
         return ResponseEntity.ok(projectMemberService.updateMemberRole(projectId, memberId, request, userId));
     }
 
     @DeleteMapping("/{memberId}")
-    public ResponseEntity<MemberResponse>updateMemberRole(
+    public ResponseEntity<MemberResponse>deleteMember(
             @PathVariable Long projectId,
             @PathVariable Long memberId
     ){

@@ -14,6 +14,11 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     @Query("""
             SELECT p FROM Project p
             where p.deletedAt is null
+            and exists(
+                select 1 from ProjectMember pm 
+                where pm.id.projectId = p.id 
+                and pm.id.userId = :userId
+            )
             order by p.updatedAt desc
            """
     )
@@ -23,6 +28,11 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
             select p from Project p
             where p.id=:projectId
                 and p.deletedAt is null
+                and exists(
+                    select 1 from ProjectMember pm
+                    where pm.id.projectId = :projectId
+                    and pm.id.userId = :userId
+            )
            """
     )
     Optional<Project>findAccessibleProjectById(@Param("projectId")Long projectId,

@@ -10,7 +10,6 @@ import com.koushik.projects.lovable_clone.entity.User;
 import com.koushik.projects.lovable_clone.enums.ProjectRole;
 import com.koushik.projects.lovable_clone.error.ResourceNotFoundException;
 import com.koushik.projects.lovable_clone.mapper.ProjectMapper;
-import com.koushik.projects.lovable_clone.mapper.ProjectMemberMapper;
 import com.koushik.projects.lovable_clone.repository.ProjectMemberRepository;
 import com.koushik.projects.lovable_clone.repository.ProjectRepository;
 import com.koushik.projects.lovable_clone.repository.UserRepository;
@@ -20,11 +19,11 @@ import jakarta.transaction.Transactional;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -39,7 +38,7 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     public ProjectResponse createProject(ProjectRequest request) {
-        Long userId = authUtil.getCurrentUserById();
+        Long userId = authUtil.getCurrentUserId();
 //        User owner = userRepository.findById(userId).orElseThrow(
 //                () -> new ResourceNotFoundException("User", userId.toString())
 //        );
@@ -70,31 +69,34 @@ public class ProjectServiceImpl implements ProjectService {
 //                .stream()
 //                .map(project -> projectMapper.toProjectSummaryResponse(project))
 //                .collect(Collectors.toList());
-        Long userId = authUtil.getCurrentUserById();
+        Long userId = authUtil.getCurrentUserId();
         var projects = projectRepository.findAllAccessibleByUser(userId);
         return projectMapper.toListOfProjectSummaryResponse(projects);
     }
 
     @Override
-    public ProjectResponse getUserProjectById(Long id) {
-        Long userId = authUtil.getCurrentUserById();
-        Project project = getAccessibleProjectById(id,userId);
+    @PreAuthorize("@security.canViewProject(#projectId)")
+    public ProjectResponse getUserProjectById(Long projectId) {
+        Long userId = authUtil.getCurrentUserId();
+        Project project = getAccessibleProjectById(projectId,userId);
         return projectMapper.toProjectResponse(project);
     }
 
     @Override
-    public ProjectResponse updateProject(Long id, ProjectRequest request) {
-        Long userId = authUtil.getCurrentUserById();
-        Project project = getAccessibleProjectById(id,userId);
+    @PreAuthorize("@security.canEditProject(#projectId)")
+    public ProjectResponse updateProject(Long projectId, ProjectRequest request) {
+        Long userId = authUtil.getCurrentUserId();
+        Project project = getAccessibleProjectById(projectId,userId);
         project.setName(request.name());
         project = projectRepository.save(project);
         return projectMapper.toProjectResponse(project);
     }
 
     @Override
-    public void softDelete(Long id) {
-        Long userId = authUtil.getCurrentUserById();
-        Project project = getAccessibleProjectById(id,userId);
+    @PreAuthorize("@security.canDeleteProject(#projectId)")
+    public void softDelete(Long projectId) {
+        Long userId = authUtil.getCurrentUserId();
+        Project project = getAccessibleProjectById(projectId,userId);
 
         project.setDeletedAt(Instant.now());
         projectRepository.save(project);

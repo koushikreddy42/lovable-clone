@@ -6,7 +6,6 @@ import com.koushik.projects.lovable_clone.dto.member.UpdateMemberRoleRequest;
 import com.koushik.projects.lovable_clone.service.ProjectMemberService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -48,7 +47,7 @@ public class ProjectMemberController {
             @PathVariable Long projectId,
             @PathVariable Long memberId
     ){
-        projectMemberService.removeMemberRole(projectId, memberId);
+        projectMemberService.removeProjectMember(projectId, memberId);
         return ResponseEntity.noContent().build();
     }
 }

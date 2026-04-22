@@ -3,8 +3,9 @@ package com.koushik.projects.lovable_clone.service;
 import com.koushik.projects.lovable_clone.dto.subscription.CheckoutRequest;
 import com.koushik.projects.lovable_clone.dto.subscription.CheckoutResponse;
 import com.koushik.projects.lovable_clone.dto.subscription.PortalResponse;
-import com.koushik.projects.lovable_clone.dto.subscription.SubscriptionResponse;
 
-public interface SubscriptionService {
-    SubscriptionResponse getCurrentSubscription(Long userId);
+public interface PaymentProcessor {
+    CheckoutResponse createCheckoutSessionUrl(CheckoutRequest request);
+
+    PortalResponse openCustomerPortal(Long userId);
 }

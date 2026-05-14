@@ -1,27 +1,51 @@
 package com.koushik.projects.lovable_clone.entity;
 
 import com.koushik.projects.lovable_clone.enums.MessageRole;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.Setter;
+import com.koushik.projects.lovable_clone.entity.ChatSession;
+import com.koushik.projects.lovable_clone.enums.MessageRole;
+import jakarta.persistence.*;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
+import java.util.List;
 
+
+@Entity
+@Table(name = "chat_messages")
 @Getter
 @Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class ChatMessage {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumns({
+            @JoinColumn(name = "project_id", referencedColumnName = "project_id", nullable = false),
+            @JoinColumn(name = "user_id", referencedColumnName = "user_id", nullable = false)
+    })
     ChatSession chatSession;
 
-    String content;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    MessageRole role; // USER, ASSISTANT
+//
+//    @OneToMany(mappedBy = "chatMessage", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+//    @OrderBy("sequenceOrder ASC")
+//    List<ChatEvent> events; // empty unless ASSISTANT role
 
-    MessageRole role;
+    @Column(columnDefinition = "text")
+    String content; // NULL unless USER role
 
-    String toolCalls;
+    Integer tokensUsed = 0;
 
-    Integer tokensUsed;
-
+    @CreationTimestamp
     Instant createdAt;
 }

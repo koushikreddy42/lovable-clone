@@ -30,7 +30,7 @@ public class AiGenerationServiceImpl implements AiGenerationService {
 
     @Override
     @PreAuthorize("@security.canEditProject(#projectId)")
-    public Flux<String> streamResponse(String message, Long projectId) {
+    public Flux<String> streamResponse(String userMessage, Long projectId) {
         Long userId = authUtil.getCurrentUserId();
         createChatSessionIfNotExists(projectId, userId);
 
@@ -42,6 +42,7 @@ public class AiGenerationServiceImpl implements AiGenerationService {
         StringBuilder fullResponseBuffer = new StringBuilder();
 
         return chatClient.prompt()
+                .user(userMessage)
                 .system(PromptUtils.CODE_GENERATION_SYSTEM_PROMPT)
                 .advisors(advisorSpec -> {
                     advisorSpec.params(advisorParams);

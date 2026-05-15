@@ -63,7 +63,7 @@ public class AiGenerationServiceImpl implements AiGenerationService {
     }
 
     private void parseAndSaveFiles(String fullResponse, Long projectId) {
-//        String dummy = """
+//        String fullResponseBuffer = """
 //                <message>I'm going to read the files and generate the code </message>
 //                <file path="src/App.jsx">
 //                    import App from './App.jsx'

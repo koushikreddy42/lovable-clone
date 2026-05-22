@@ -1,6 +1,7 @@
 package com.koushik.projects.lovable_clone.controller;
 
 import com.koushik.projects.lovable_clone.dto.chat.ChatRequest;
+import com.koushik.projects.lovable_clone.dto.chat.StreamResponse;
 import com.koushik.projects.lovable_clone.service.AiGenerationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -16,11 +17,11 @@ public class ChatController {
     private final AiGenerationService aiGenerationService;
 
     @PostMapping(value = "/api/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<ServerSentEvent<String>> streamChat(
+    public Flux<ServerSentEvent<StreamResponse>> streamChat(
             @RequestBody ChatRequest request) {
 
         return aiGenerationService.streamResponse(request.message(), request.projectId())
-                .map(data -> ServerSentEvent.<String>builder()
+                .map(data -> ServerSentEvent.<StreamResponse>builder()
                         .data(data)
                         .build());
     }

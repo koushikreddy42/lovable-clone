@@ -1,5 +1,6 @@
 package com.koushik.projects.lovable_clone.service.impl;
 
+import com.koushik.projects.lovable_clone.dto.chat.StreamResponse;
 import com.koushik.projects.lovable_clone.llm.PromptUtils;
 import com.koushik.projects.lovable_clone.security.AuthUtil;
 import com.koushik.projects.lovable_clone.service.AiGenerationService;
@@ -7,6 +8,7 @@ import com.koushik.projects.lovable_clone.service.ProjectFileService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -14,6 +16,7 @@ import reactor.core.scheduler.Schedulers;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,7 +33,7 @@ public class AiGenerationServiceImpl implements AiGenerationService {
 
     @Override
     @PreAuthorize("@security.canEditProject(#projectId)")
-    public Flux<String> streamResponse(String userMessage, Long projectId) {
+    public Flux<StreamResponse> streamResponse(String userMessage, Long projectId) {
         Long userId = authUtil.getCurrentUserId();
         createChatSessionIfNotExists(projectId, userId);
 
@@ -38,6 +41,9 @@ public class AiGenerationServiceImpl implements AiGenerationService {
                 "userId", userId,
                 "projectId", projectId
         );
+
+        AtomicReference<Long> endTime = new AtomicReference<>(0L);
+        AtomicReference<Usage> usageRef = new AtomicReference<>();
 
         StringBuilder fullResponseBuffer = new StringBuilder();
 
@@ -50,8 +56,18 @@ public class AiGenerationServiceImpl implements AiGenerationService {
                 .stream()
                 .chatResponse()
                 .doOnNext(response -> {
-                    String content = response.getResult().getOutput().getText();
-                    fullResponseBuffer.append(content);
+                    if (response.getResults() != null && !response.getResults().isEmpty()) {
+                        String content = response.getResult().getOutput().getText();
+
+                        if(content != null && !content.isEmpty() && endTime.get() == 0) { // first non-empty chunk received
+                            endTime.set(System.currentTimeMillis());
+                        }
+                        if(response.getMetadata().getUsage() != null) {
+                            usageRef.set(response.getMetadata().getUsage());
+                        }
+                        fullResponseBuffer.append(content);
+                    }
+
                 })
                 .doOnComplete(()->{
                     Schedulers.boundedElastic().schedule(() -> {
@@ -59,7 +75,13 @@ public class AiGenerationServiceImpl implements AiGenerationService {
                     });
                 })
                 .doOnError(error -> log.error("Error during streaming for projectId: {}", projectId))
-                .map(response -> Objects.requireNonNull(response.getResult().getOutput().getText()));
+                .map(response -> {
+                    if (response.getResults() != null && !response.getResults().isEmpty()) {
+                        String text = response.getResult().getOutput().getText();
+                        return new StreamResponse(text != null ? text : "");
+                    }
+                    return new StreamResponse("");
+                });
     }
 
     private void parseAndSaveFiles(String fullResponse, Long projectId) {

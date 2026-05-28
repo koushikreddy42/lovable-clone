@@ -1,9 +1,15 @@
 package com.koushik.projects.lovable_clone.service.impl;
 
 import com.koushik.projects.lovable_clone.dto.chat.StreamResponse;
+import com.koushik.projects.lovable_clone.entity.*;
+import com.koushik.projects.lovable_clone.enums.ChatEventType;
+import com.koushik.projects.lovable_clone.enums.MessageRole;
+import com.koushik.projects.lovable_clone.error.ResourceNotFoundException;
+import com.koushik.projects.lovable_clone.llm.LlmResponseParser;
 import com.koushik.projects.lovable_clone.llm.PromptUtils;
 import com.koushik.projects.lovable_clone.llm.advisors.FileTreeContextAdvisor;
 import com.koushik.projects.lovable_clone.llm.tools.CodeGenerationTools;
+import com.koushik.projects.lovable_clone.repository.*;
 import com.koushik.projects.lovable_clone.security.AuthUtil;
 import com.koushik.projects.lovable_clone.service.AiGenerationService;
 import com.koushik.projects.lovable_clone.service.ProjectFileService;
@@ -16,6 +22,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
@@ -31,6 +38,12 @@ public class AiGenerationServiceImpl implements AiGenerationService {
     private final AuthUtil authUtil;
     private final ProjectFileService projectFileService;
     private final FileTreeContextAdvisor fileTreeContextAdvisor;
+    private final ChatMessageRepository chatMessageRepository;
+    private final UserRepository userRepository;
+    private final ProjectRepository projectRepository;
+    private final ChatSessionRepository chatSessionRepository;
+    private final LlmResponseParser llmResponseParser;
+    private final ChatEventRepository chatEventRepository;
 
     private static final Pattern FILE_TAG_PATTERN = Pattern.compile("<file path=\"([^\"]+)\">(.*?)</file>", Pattern.DOTALL);
 
@@ -38,13 +51,14 @@ public class AiGenerationServiceImpl implements AiGenerationService {
     @PreAuthorize("@security.canEditProject(#projectId)")
     public Flux<StreamResponse> streamResponse(String userMessage, Long projectId) {
         Long userId = authUtil.getCurrentUserId();
-        createChatSessionIfNotExists(projectId, userId);
+        ChatSession chatSession = createChatSessionIfNotExists(projectId, userId);
 
         Map<String, Object> advisorParams = Map.of(
                 "userId", userId,
                 "projectId", projectId
         );
 
+        AtomicReference<Long> startTime = new AtomicReference<>(System.currentTimeMillis());
         AtomicReference<Long> endTime = new AtomicReference<>(0L);
         AtomicReference<Usage> usageRef = new AtomicReference<>();
 
@@ -78,7 +92,8 @@ public class AiGenerationServiceImpl implements AiGenerationService {
                 })
                 .doOnComplete(()->{
                     Schedulers.boundedElastic().schedule(() -> {
-                        parseAndSaveFiles(fullResponseBuffer.toString(), projectId);
+                        long duration = (endTime.get() - startTime.get()) /  1000;
+                        finalizeChats(userMessage, chatSession, fullResponseBuffer.toString(), duration, usageRef.get());
                     });
                 })
                 .doOnError(error -> log.error("Error during streaming for projectId: {}", projectId))
@@ -91,27 +106,66 @@ public class AiGenerationServiceImpl implements AiGenerationService {
                 });
     }
 
-    private void parseAndSaveFiles(String fullResponse, Long projectId) {
-//        String fullResponseBuffer = """
-//                <message>I'm going to read the files and generate the code </message>
-//                <file path="src/App.jsx">
-//                    import App from './App.jsx'
-//                    .....
-//                </file>
-//                <message>I'm going to read the files and generate the code </message>
-//                <file path="src/App.jsx">
-//                    import App from './App.jsx'
-//                    .....
-//                </file>
-//                """;
-        Matcher matcher = FILE_TAG_PATTERN.matcher(fullResponse);
-        while(matcher.find()){
-            String filePath = matcher.group(1);
-            String fileContent = matcher.group(2).trim();
-            projectFileService.saveFile(projectId, filePath, fileContent);
-        }
+    private void finalizeChats(String userMessage, ChatSession chatSession, String fullText, Long duration, Usage usage) {
+        Long projectId = chatSession.getProject().getId();
+
+//        if(usage != null) {
+//            int totalTokens = usage.getTotalTokens();
+//            usageService.recordTokenUsage(chatSession.getUser().getId(), totalTokens);
+//        }
+
+        // Save the User message
+        chatMessageRepository.save(
+                ChatMessage.builder()
+                        .chatSession(chatSession)
+                        .role(MessageRole.USER)
+                        .content(userMessage)
+                        .tokensUsed(usage.getPromptTokens())
+                        .build()
+        );
+
+        ChatMessage assistantChatMessage = ChatMessage.builder()
+                .role(MessageRole.ASSISTANT)
+                .content("Assistant Message here...")
+                .chatSession(chatSession)
+                .tokensUsed(usage.getCompletionTokens())
+                .build();
+
+        assistantChatMessage = chatMessageRepository.save(assistantChatMessage);
+
+        List<ChatEvent> chatEventList = llmResponseParser.parseChatEvents(fullText, assistantChatMessage);
+        chatEventList.addFirst(ChatEvent.builder()
+                .type(ChatEventType.THOUGHT)
+                .chatMessage(assistantChatMessage)
+                .content("Thought for "+duration+"s")
+                .sequenceOrder(0)
+                .build());
+
+        chatEventList.stream()
+                .filter(e -> e.getType() == ChatEventType.FILE_EDIT)
+                .forEach(e -> projectFileService.saveFile(projectId, e.getFilePath(), e.getContent()));
+
+        chatEventRepository.saveAll(chatEventList);
     }
 
-    private void createChatSessionIfNotExists(Long projectId, Long userId) {
+    private ChatSession createChatSessionIfNotExists(Long projectId, Long userId) {
+        ChatSessionId chatSessionId = new ChatSessionId(projectId, userId);
+        ChatSession chatSession = chatSessionRepository.findById(chatSessionId).orElse(null);
+
+        if(chatSession == null) {
+            Project project = projectRepository.findById(projectId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Project", projectId.toString()));
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("User", userId.toString()));
+
+            chatSession = ChatSession.builder()
+                    .id(chatSessionId)
+                    .project(project)
+                    .user(user)
+                    .build();
+
+            chatSession = chatSessionRepository.save(chatSession);
+        }
+        return chatSession;
     }
 }

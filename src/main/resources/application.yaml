@@ -22,7 +22,7 @@ spring:
 #      base-url: https://openrouter.ai/api
       chat:
         options:
-          model: gpt-4o-mini
+          model: gpt-4o
           temperature: 0.0
 
 

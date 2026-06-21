@@ -2,13 +2,11 @@ package com.koushik.projects.lovable_clone.controller;
 
 import com.koushik.projects.lovable_clone.dto.project.FileContentResponse;
 import com.koushik.projects.lovable_clone.dto.project.FileNode;
+import com.koushik.projects.lovable_clone.dto.project.FileTreeResponse;
 import com.koushik.projects.lovable_clone.service.ProjectFileService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -19,17 +17,15 @@ public class FileController {
     private final ProjectFileService projectFileService;
 
     @GetMapping
-    public ResponseEntity<List<FileNode>> getFileTree(@PathVariable Long projectId){
+    public ResponseEntity<FileTreeResponse> getFileTree(@PathVariable Long projectId){
         Long userId = 1L;
         return ResponseEntity.ok(projectFileService.getFileTree(projectId));
     }
 
-    @GetMapping("/{*path}")
+    @GetMapping("/content")
     public ResponseEntity<FileContentResponse> getFile(
             @PathVariable Long projectId,
-            @PathVariable String path
-    ){
-        Long userId = 1L;
+            @RequestParam String path) {
         return ResponseEntity.ok(projectFileService.getFileContent(projectId, path));
     }
 }

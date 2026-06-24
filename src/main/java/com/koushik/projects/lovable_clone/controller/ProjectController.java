@@ -1,11 +1,14 @@
 package com.koushik.projects.lovable_clone.controller;
 
 
+import com.koushik.projects.lovable_clone.dto.deploy.DeployResponse;
 import com.koushik.projects.lovable_clone.dto.project.ProjectRequest;
 import com.koushik.projects.lovable_clone.dto.project.ProjectResponse;
 import com.koushik.projects.lovable_clone.dto.project.ProjectSummaryResponse;
 import com.koushik.projects.lovable_clone.security.AuthUtil;
+import com.koushik.projects.lovable_clone.service.DeploymentService;
 import com.koushik.projects.lovable_clone.service.ProjectService;
+import io.fabric8.kubernetes.api.model.apps.Deployment;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,6 +23,7 @@ import java.util.List;
 public class ProjectController {
 
     private final ProjectService projectService;
+    private final DeploymentService deploymentService;
 
     @GetMapping
     public ResponseEntity<List<ProjectSummaryResponse>> getMyProjects(){
@@ -45,5 +49,10 @@ public class ProjectController {
     public ResponseEntity<Void> deleteProject(@PathVariable Long id){
         projectService.softDelete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/deploy")
+    public ResponseEntity<DeployResponse> deployProject(@PathVariable Long id) {
+        return ResponseEntity.ok(deploymentService.deploy(id));
     }
 }
